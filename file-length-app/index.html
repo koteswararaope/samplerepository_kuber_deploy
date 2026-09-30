@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Length Checker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📁 File Length Checker</h1>
+            <p class="description">Select a file to check its size</p>
+            
+            <div class="upload-section">
+                <label for="fileInput" class="file-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span id="fileName">Choose a file</span>
+                </label>
+                <input type="file" id="fileInput" accept="*/*">
+            </div>
+
+            <div id="resultSection" class="result-section hidden">
+                <h2>File Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">File Name:</span>
+                        <span class="info-value" id="displayFileName">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">File Type:</span>
+                        <span class="info-value" id="fileType">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">File Size (Bytes):</span>
+                        <span class="info-value" id="fileSizeBytes">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">File Size (Readable):</span>
+                        <span class="info-value" id="fileSizeReadable">-</span>
+                    </div>
+                    <div class="info-item highlight">
+                        <span class="info-label">📝 Text Length:</span>
+                        <span class="info-value" id="textLength">Reading...</span>
+                    </div>
+                    <div class="info-item highlight">
+                        <span class="info-label">📊 Line Count:</span>
+                        <span class="info-value" id="lineCount">Reading...</span>
+                    </div>
+                    <div class="info-item highlight">
+                        <span class="info-label">📖 Word Count:</span>
+                        <span class="info-value" id="wordCount">Reading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Last Modified:</span>
+                        <span class="info-value" id="lastModified">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

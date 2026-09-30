@@ -1,0 +1,80 @@
+name: CI - Build and Test
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'file-length-app/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'file-length-app/**'
+  workflow_dispatch:
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Dockerfile
+        run: |
+          cd file-length-app
+          docker run --rm -i hadolint/hadolint < Dockerfile || true
+
+      - name: Validate docker-compose.yml
+        run: |
+          cd file-length-app
+          docker-compose config
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: lint-and-validate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          cd file-length-app
+          docker build -t file-length-checker:test .
+
+      - name: Run container
+        run: |
+          docker run -d -p 8080:80 --name test-app file-length-checker:test
+          sleep 5
+
+      - name: Test application
+        run: |
+          # Test if the application is responding
+          curl -f http://localhost:8080 || exit 1
+          
+          # Check if all required files are present
+          docker exec test-app ls /usr/share/nginx/html/index.html
+          docker exec test-app ls /usr/share/nginx/html/styles.css
+          docker exec test-app ls /usr/share/nginx/html/script.js
+
+      - name: Check logs
+        if: always()
+        run: docker logs test-app
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop test-app || true
+          docker rm test-app || true
+
+      - name: Build summary
+        run: |
+          echo "### Build Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Docker image built successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Container started successfully" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Application responding to HTTP requests" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All required files present" >> $GITHUB_STEP_SUMMARY

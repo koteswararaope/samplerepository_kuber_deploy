@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  file-length-app:
+    build: .
+    container_name: file-length-checker
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
