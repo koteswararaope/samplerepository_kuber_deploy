@@ -1,0 +1,52 @@
+name: Simple Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Print success message
+        run: |
+          echo "✅ GitHub Actions is working!"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+      
+      - name: List repository files
+        run: |
+          echo "Files in repository:"
+          ls -la
+      
+      - name: Check Docker files
+        run: |
+          echo "Checking for Docker files..."
+          if [ -f "Dockerfile" ]; then
+            echo "✅ Dockerfile found"
+          else
+            echo "❌ Dockerfile not found"
+          fi
+          
+          if [ -f "docker-compose.yml" ]; then
+            echo "✅ docker-compose.yml found"
+          else
+            echo "❌ docker-compose.yml not found"
+          fi
+      
+      - name: Success summary
+        run: |
+          echo "### ✅ GitHub Actions Test Successful! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If you see this, GitHub Actions is working correctly!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the other workflows (CI, Docker Build, etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Configure Docker Hub secrets if needed" >> $GITHUB_STEP_SUMMARY
+          echo "3. Delete this test workflow if not needed" >> $GITHUB_STEP_SUMMARY
