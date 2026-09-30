@@ -7,8 +7,6 @@ on:
       - master
     tags:
       - 'v*'
-    paths:
-      - 'file-length-app/**'
   release:
     types: [published]
   workflow_dispatch:
@@ -54,8 +52,8 @@ jobs:
       - name: Build and push to GHCR
         uses: docker/build-push-action@v5
         with:
-          context: ./file-length-app
-          file: ./file-length-app/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

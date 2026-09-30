@@ -5,14 +5,10 @@ on:
     branches:
       - main
       - master
-    paths:
-      - 'file-length-app/**'
   pull_request:
     branches:
       - main
       - master
-    paths:
-      - 'file-length-app/**'
   workflow_dispatch:
 
 env:
@@ -53,8 +49,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./file-length-app
-          file: ./file-length-app/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

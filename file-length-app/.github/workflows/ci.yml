@@ -3,12 +3,8 @@ name: CI - Build and Test
 on:
   push:
     branches: [ main, master, develop ]
-    paths:
-      - 'file-length-app/**'
   pull_request:
     branches: [ main, master ]
-    paths:
-      - 'file-length-app/**'
   workflow_dispatch:
 
 jobs:
@@ -21,12 +17,10 @@ jobs:
 
       - name: Validate Dockerfile
         run: |
-          cd file-length-app
           docker run --rm -i hadolint/hadolint < Dockerfile || true
 
       - name: Validate docker-compose.yml
         run: |
-          cd file-length-app
           docker-compose config
 
   build-and-test:
@@ -42,7 +36,6 @@ jobs:
 
       - name: Build Docker image
         run: |
-          cd file-length-app
           docker build -t file-length-checker:test .
 
       - name: Run container
