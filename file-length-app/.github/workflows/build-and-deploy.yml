@@ -1,0 +1,304 @@
+name: Build and Docker Image Creation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: file-length-checker
+  REGISTRY: ghcr.io
+
+jobs:
+  # Job 1: Build and Test Application
+  build-application:
+    name: Build and Test Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate HTML files
+        run: |
+          echo "=== Validating HTML files ==="
+          if [ -f "index.html" ]; then
+            echo "✅ index.html found"
+            # Check if file is not empty
+            if [ -s "index.html" ]; then
+              echo "✅ index.html is not empty"
+            else
+              echo "❌ index.html is empty"
+              exit 1
+            fi
+          else
+            echo "❌ index.html not found"
+            exit 1
+          fi
+
+      - name: Validate CSS files
+        run: |
+          echo "=== Validating CSS files ==="
+          if [ -f "styles.css" ]; then
+            echo "✅ styles.css found"
+            if [ -s "styles.css" ]; then
+              echo "✅ styles.css is not empty"
+            else
+              echo "❌ styles.css is empty"
+              exit 1
+            fi
+          else
+            echo "❌ styles.css not found"
+            exit 1
+          fi
+
+      - name: Validate JavaScript files
+        run: |
+          echo "=== Validating JavaScript files ==="
+          if [ -f "script.js" ]; then
+            echo "✅ script.js found"
+            if [ -s "script.js" ]; then
+              echo "✅ script.js is not empty"
+            else
+              echo "❌ script.js is empty"
+              exit 1
+            fi
+          else
+            echo "❌ script.js not found"
+            exit 1
+          fi
+
+      - name: Validate Dockerfile
+        run: |
+          echo "=== Validating Dockerfile ==="
+          if [ -f "Dockerfile" ]; then
+            echo "✅ Dockerfile found"
+            # Use hadolint to validate Dockerfile
+            docker run --rm -i hadolint/hadolint < Dockerfile || echo "⚠️ Dockerfile has warnings (non-blocking)"
+          else
+            echo "❌ Dockerfile not found"
+            exit 1
+          fi
+
+      - name: Validate docker-compose.yml
+        run: |
+          echo "=== Validating docker-compose.yml ==="
+          if [ -f "docker-compose.yml" ]; then
+            echo "✅ docker-compose.yml found"
+            docker-compose config > /dev/null
+            echo "✅ docker-compose.yml is valid"
+          else
+            echo "❌ docker-compose.yml not found"
+            exit 1
+          fi
+
+      - name: Application build summary
+        run: |
+          echo "### ✅ Application Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All application files validated successfully:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ HTML files validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CSS files validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ JavaScript files validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dockerfile validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ docker-compose.yml validated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Proceeding to Docker image build...**" >> $GITHUB_STEP_SUMMARY
+
+  # Job 2: Build Docker Image (only runs if build-application succeeds)
+  build-docker-image:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build-application
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ github.ref_name }}
+
+      - name: Docker build summary
+        run: |
+          echo "### 🐳 Docker Image Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry: \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image Name: \`${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "**Pull Command:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Note:** Image built but not pushed (pull request)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 3: Test Docker Image (only runs if build-docker-image succeeds)
+  test-docker-image:
+    name: Test Docker Image
+    runs-on: ubuntu-latest
+    needs: build-docker-image
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull Docker image
+        run: |
+          echo "=== Pulling Docker image ==="
+          docker pull ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Run Docker container
+        run: |
+          echo "=== Starting Docker container ==="
+          docker run -d -p 8080:80 --name test-container \
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+          
+          echo "Waiting for container to start..."
+          sleep 5
+
+      - name: Test application endpoints
+        run: |
+          echo "=== Testing application ==="
+          
+          # Test if application is responding
+          echo "Testing HTTP response..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080)
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Application is responding (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Application returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          
+          # Test if index.html is served
+          echo "Testing index.html..."
+          curl -f http://localhost:8080/index.html > /dev/null 2>&1
+          echo "✅ index.html is accessible"
+          
+          # Test if styles.css is served
+          echo "Testing styles.css..."
+          curl -f http://localhost:8080/styles.css > /dev/null 2>&1
+          echo "✅ styles.css is accessible"
+          
+          # Test if script.js is served
+          echo "Testing script.js..."
+          curl -f http://localhost:8080/script.js > /dev/null 2>&1
+          echo "✅ script.js is accessible"
+
+      - name: Check container logs
+        if: always()
+        run: |
+          echo "=== Container logs ==="
+          docker logs test-container
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "=== Cleaning up ==="
+          docker stop test-container || true
+          docker rm test-container || true
+
+      - name: Test summary
+        run: |
+          echo "### ✅ Docker Image Tests Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All tests completed successfully:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Container started successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Application responding on HTTP" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ All static files accessible" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image is ready for deployment! 🚀**" >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Final Summary
+  workflow-summary:
+    name: Workflow Summary
+    runs-on: ubuntu-latest
+    needs: [build-application, build-docker-image, test-docker-image]
+    if: always()
+    
+    steps:
+      - name: Generate workflow summary
+        run: |
+          echo "# 🎉 Workflow Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Application | ${{ needs.build-application.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Docker Image | ${{ needs.build-docker-image.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Docker Image | ${{ needs.test-docker-image.result }} |" >> $GITHUB_STEP_SUMMARY
